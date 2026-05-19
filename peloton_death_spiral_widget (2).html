@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Peloton Death Spiral Risk Widget</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #141b34;
+      --muted: #9fb0d1;
+      --text: #eef4ff;
+      --accent: #77c3ff;
+      --good: #3ddc97;
+      --warn: #ffcc66;
+      --bad: #ff6b6b;
+      --line: #2a355d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: Inter, Arial, sans-serif; background: linear-gradient(180deg,#0a0f1d,#101735);
+      color: var(--text); padding: 24px;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; font-size: 30px; }
+    .sub { color: var(--muted); margin-bottom: 20px; line-height: 1.45; }
+    .grid {
+      display: grid; grid-template-columns: 360px 1fr; gap: 18px;
+    }
+    .card {
+      background: rgba(20,27,52,.92); border: 1px solid var(--line); border-radius: 18px;
+      padding: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin-bottom: 14px; }
+    .field { margin-bottom: 16px; }
+    .field label { display:flex; justify-content:space-between; gap:8px; font-size:14px; margin-bottom:6px; }
+    .field input[type=range] { width: 100%; }
+    .field input[type=number] {
+      width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+      background:#0f1630; color: var(--text);
+    }
+    .value { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .stats {
+      display:grid; grid-template-columns: repeat(4,1fr); gap:12px; margin-bottom: 16px;
+    }
+    .stat {
+      background:#0f1630; border:1px solid var(--line); border-radius:14px; padding:14px;
+    }
+    .stat .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+    .stat .v { font-size: 26px; margin-top: 6px; font-weight: 700; }
+    .riskbox {
+      display:flex; align-items:center; justify-content:space-between; gap: 12px; padding:14px;
+      border-radius:14px; border:1px solid var(--line); background:#0f1630; margin-bottom:16px;
+    }
+    .badge { padding:8px 12px; border-radius:999px; font-weight:700; font-size:14px; }
+    .low { background: rgba(61,220,151,.15); color: var(--good); }
+    .med { background: rgba(255,204,102,.15); color: var(--warn); }
+    .high { background: rgba(255,107,107,.15); color: var(--bad); }
+    svg { width:100%; height:auto; display:block; }
+    table { width:100%; border-collapse: collapse; font-size:14px; }
+    th, td { padding:10px 8px; border-bottom:1px solid var(--line); text-align:right; }
+    th:first-child, td:first-child { text-align:left; }
+    .foot {
+      margin-top: 18px; color: var(--muted); font-size: 13px; line-height: 1.5;
+    }
+    a { color: var(--accent); }
+    .tiny { font-size:12px; color: var(--muted); }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Peloton Death Spiral Risk Widget</h1>
+  <div class="sub">
+    Subscriber-per-year model with a 5-year outlook using current Peloton public filing data as defaults.
+    This widget starts from Peloton's FY2025 paid connected fitness subscriber base and subscription economics, then lets you stress-test churn, pricing, variable cost, and fixed costs.[doc1][doc3]
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="section-title">Inputs</div>
+
+      <div class="field">
+        <label for="fixedCost">Annual fixed costs <span class="value" id="fixedCostVal"></span></label>
+        <input type="range" id="fixedCost" min="300000000" max="1800000000" step="10000000" value="1183100000">
+        <input type="number" id="fixedCostNum" value="1183100000" aria-label="Annual fixed costs dollars">
+        <div class="tiny">Default proxy uses FY2025 Sales & Marketing + G&A + R&D = $1.183B.[doc1]</div>
+      </div>
+
+      <div class="field">
+        <label for="varCost">Variable cost per subscriber per year <span class="value" id="varCostVal"></span></label>
+        <input type="range" id="varCost" min="50" max="500" step="1" value="184.5">
+        <input type="number" id="varCostNum" value="184.5" step="0.01" aria-label="Variable cost per subscriber per year">
+        <div class="tiny">Default uses FY2025 subscription cost of revenue ÷ ending paid connected fitness subscriptions.[doc1]</div>
+      </div>
+
+      <div class="field">
+        <label for="revPerUnit">Revenue per subscriber per year <span class="value" id="revPerUnitVal"></span></label>
+        <input type="range" id="revPerUnit" min="100" max="1000" step="1" value="597.76">
+        <input type="number" id="revPerUnitNum" value="597.76" step="0.01" aria-label="Revenue per subscriber per year">
+        <div class="tiny">Default uses FY2025 subscription revenue ÷ ending paid connected fitness subscriptions.[doc1]</div>
+      </div>
+
+      <div class="field">
+        <label for="users">Starting subscribers <span class="value" id="usersVal"></span></label>
+        <input type="range" id="users" min="500000" max="5000000" step="1000" value="2799943">
+        <input type="number" id="usersNum" value="2799943" step="1" aria-label="Starting subscribers">
+        <div class="tiny">Default uses FY2025 ending paid connected fitness subscriptions of 2,799,943.[doc1]</div>
+      </div>
+
+      <div class="field">
+        <label for="defection">Annual defection rate <span class="value" id="defectionVal"></span></label>
+        <input type="range" id="defection" min="0" max="50" step="0.1" value="17.6">
+        <input type="number" id="defectionNum" value="17.6" step="0.01" aria-label="Annual defection rate percent">
+        <div class="tiny">Default annualized from FY2025 average net monthly paid connected fitness churn of 1.6%.[doc1]</div>
+      
+<div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;"><button id="resetDefaultsBtn" class="btn secondary">Reset to Defaults</button></div>
+</div>
+    </div>
+
+    <div class="card">
+      <div class="riskbox">
+        <div>
+          <div class="section-title" style="margin:0 0 6px;">Risk Summary</div>
+          <div id="riskText">Loading...</div>
+        </div>
+        <div id="riskBadge" class="badge med">Moderate</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="k">Break-even subscribers</div><div class="v" id="beUsers"></div></div>
+        <div class="stat"><div class="k">Year 1 profit</div><div class="v" id="yr1Profit"></div></div>
+        <div class="stat"><div class="k">Year 5 subscribers</div><div class="v" id="yr5Users"></div></div>
+        <div class="stat"><div class="k">Crosses break-even in</div><div class="v" id="crossYear"></div></div>
+      </div>
+
+      <div class="card" style="padding:12px; margin-bottom:16px;">
+        <div class="section-title">5-Year Subscriber Outlook</div>
+        <svg id="chart" viewBox="0 0 800 260" role="img" aria-label="Five year subscriber and break-even chart"></svg>
+      </div>
+
+      <div class="card" style="padding:12px;">
+        <div class="section-title">Annual Outlook Table</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th>Subscribers</th>
+              <th>Revenue</th>
+              <th>Variable Cost</th>
+              <th>Contribution</th>
+              <th>Profit / Loss</th>
+            </tr>
+          </thead>
+          <tbody id="tbl"></tbody>
+        </table>
+      </div>
+
+      <div class="foot">
+        <strong>Default data sources</strong><br>
+        Peloton FY2025 10-K / SEC filing summary: ending paid connected fitness subscriptions of 2,799,943, average net monthly paid connected fitness subscription churn of 1.6%, subscription revenue of $1.6737B, subscription cost of revenue of $516.6M, and FY2025 Sales & Marketing of $421.6M, G&A of $527.3M, and R&D of $234.2M.[doc1][doc3]<br><br>
+        Source links:<br>
+        <a href="https://www.sec.gov/Archives/edgar/data/1639825/000163982525000138/pton-20250630.htm" target="_blank" rel="noopener">SEC filing page</a>[doc3]<br>
+        <a href="https://last10k.com/sec-filings/pton/0001639825-25-000138.htm" target="_blank" rel="noopener">Last10K mirror</a>[doc3]<br>
+        <a href="https://www.stocktitan.net/sec-filings/PTON/10-k-peloton-interactive-inc-files-annual-report-c1a78989dac0.html" target="_blank" rel="noopener">StockTitan summary</a>[doc1]
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const els = {
+  fixedCost: document.getElementById('fixedCost'),
+  fixedCostNum: document.getElementById('fixedCostNum'),
+  varCost: document.getElementById('varCost'),
+  varCostNum: document.getElementById('varCostNum'),
+  revPerUnit: document.getElementById('revPerUnit'),
+  revPerUnitNum: document.getElementById('revPerUnitNum'),
+  users: document.getElementById('users'),
+  usersNum: document.getElementById('usersNum'),
+  defection: document.getElementById('defection'),
+  defectionNum: document.getElementById('defectionNum'),
+};
+
+function fmtNum(n) {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n);
+}
+function fmtMoney(n) {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1e9) return sign + '$' + (abs/1e9).toFixed(2) + 'B';
+  if (abs >= 1e6) return sign + '$' + (abs/1e6).toFixed(1) + 'M';
+  if (abs >= 1e3) return sign + '$' + (abs/1e3).toFixed(1) + 'K';
+  return sign + '$' + abs.toFixed(0);
+}
+function sync(a,b) {
+  a.addEventListener('input', () => { b.value = a.value; update(); });
+  b.addEventListener('input', () => { a.value = b.value; update(); });
+}
+sync(els.fixedCost, els.fixedCostNum);
+sync(els.varCost, els.varCostNum);
+sync(els.revPerUnit, els.revPerUnitNum);
+sync(els.users, els.usersNum);
+sync(els.defection, els.defectionNum);
+
+function project() {
+  const F = parseFloat(els.fixedCost.value);
+  const v = parseFloat(els.varCost.value);
+  const p = parseFloat(els.revPerUnit.value);
+  const U0 = parseFloat(els.users.value);
+  const d = parseFloat(els.defection.value)/100.0;
+  const margin = p - v;
+  const be = margin > 0 ? F / margin : Infinity;
+  const years = [];
+  for (let t = 0; t <= 5; t++) {
+    const U = U0 * Math.pow(1-d, t);
+    const rev = p * U;
+    const vc = v * U;
+    const contrib = (p-v) * U;
+    const profit = contrib - F;
+    years.push({t,U,rev,vc,contrib,profit});
+  }
+  let cross = 'Never';
+  for (let i=0;i<years.length;i++) {
+    if (years[i].U < be) { cross = 'Y' + years[i].t; break; }
+  }
+  let risk = 'Low', badge='low', txt='';
+  if (!isFinite(be) || margin <= 0) {
+    risk='High'; badge='high';
+    txt='Contribution margin is non-positive, so each subscriber does not cover variable cost. That creates immediate structural death-spiral risk.';
+  } else {
+    const ratio0 = U0 / be;
+    const ratio5 = years[5].U / be;
+    if (ratio0 < 1 || ratio5 < 0.8) {
+      risk='High'; badge='high';
+      txt='Subscribers are below break-even now or projected to fall well below it within 5 years, increasing the odds of a loss-driven contraction loop.';
+    } else if (ratio5 < 1.1 || d > 0.18) {
+      risk='Moderate'; badge='med';
+      txt='Peloton stays near break-even under this scenario, but modest churn or cost pressure could push it into a self-reinforcing decline.';
+    } else {
+      risk='Low'; badge='low';
+      txt='Subscribers remain comfortably above break-even in this scenario, reducing near-term death-spiral pressure.';
+    }
+  }
+  return {F,v,p,U0,d,margin,be,years,cross,risk,badge,txt};
+}
+
+function drawChart(data) {
+  const svg = document.getElementById('chart');
+  const W = 800, H = 260, m = {l:60,r:20,t:20,b:36};
+  const pw = W-m.l-m.r, ph = H-m.t-m.b;
+  const maxY = Math.max(...data.years.map(y=>y.U), isFinite(data.be)?data.be:0) * 1.1;
+  const x = t => m.l + (t/5)*pw;
+  const y = v => m.t + ph - (v/maxY)*ph;
+
+  const line = data.years.map((d,i)=>`${i?'L':'M'} ${x(d.t).toFixed(1)} ${y(d.U).toFixed(1)}`).join(' ');
+  const beY = isFinite(data.be) ? y(data.be) : null;
+
+  let axes = `<line x1="${m.l}" y1="${m.t}" x2="${m.l}" y2="${H-m.b}" stroke="#50608f"/>
+              <line x1="${m.l}" y1="${H-m.b}" x2="${W-m.r}" y2="${H-m.b}" stroke="#50608f"/>`;
+
+  let ticks = '';
+  for (let i=0;i<=5;i++) {
+    ticks += `<line x1="${x(i)}" y1="${H-m.b}" x2="${x(i)}" y2="${H-m.b+6}" stroke="#50608f"/>
+              <text x="${x(i)}" y="${H-12}" text-anchor="middle" fill="#9fb0d1" font-size="12">Y${i}</text>`;
+  }
+  for (let j=0;j<=4;j++) {
+    const val = maxY*j/4;
+    ticks += `<line x1="${m.l-6}" y1="${y(val)}" x2="${m.l}" y2="${y(val)}" stroke="#50608f"/>
+              <text x="${m.l-10}" y="${y(val)+4}" text-anchor="end" fill="#9fb0d1" font-size="12">${fmtNum(Math.round(val))}</text>`;
+  }
+
+  let beLine = '';
+  if (beY !== null && isFinite(beY)) {
+    beLine = `<line x1="${m.l}" y1="${beY}" x2="${W-m.r}" y2="${beY}" stroke="#ffcc66" stroke-dasharray="6 6"/>
+              <text x="${W-m.r-4}" y="${beY-6}" text-anchor="end" fill="#ffcc66" font-size="12">Break-even</text>`;
+  }
+
+  let pts = data.years.map(d => `<circle cx="${x(d.t)}" cy="${y(d.U)}" r="4" fill="#77c3ff"/>`).join('');
+  svg.innerHTML = `
+    <rect x="0" y="0" width="${W}" height="${H}" rx="12" fill="#0f1630"/>
+    ${axes} ${ticks}
+    ${beLine}
+    <path d="${line}" fill="none" stroke="#77c3ff" stroke-width="3"/>
+    ${pts}
+  `;
+}
+
+function update() {
+  const d = project();
+
+  document.getElementById('fixedCostVal').textContent = fmtMoney(d.F);
+  document.getElementById('varCostVal').textContent = fmtMoney(d.v);
+  document.getElementById('revPerUnitVal').textContent = fmtMoney(d.p);
+  document.getElementById('usersVal').textContent = fmtNum(d.U0);
+  document.getElementById('defectionVal').textContent = (d.d*100).toFixed(2) + '%';
+
+  document.getElementById('beUsers').textContent = isFinite(d.be) ? fmtNum(Math.round(d.be)) : 'N/A';
+  document.getElementById('yr1Profit').textContent = fmtMoney(d.years[1].profit);
+  document.getElementById('yr5Users').textContent = fmtNum(Math.round(d.years[5].U));
+  document.getElementById('crossYear').textContent = d.cross;
+
+  document.getElementById('riskText').textContent = d.txt;
+  const rb = document.getElementById('riskBadge');
+  rb.textContent = d.risk;
+  rb.className = 'badge ' + d.badge;
+
+  const tbody = document.getElementById('tbl');
+  tbody.innerHTML = d.years.map(r => `
+    <tr>
+      <td>Y${r.t}</td>
+      <td>${fmtNum(Math.round(r.U))}</td>
+      <td>${fmtMoney(r.rev)}</td>
+      <td>${fmtMoney(r.vc)}</td>
+      <td>${fmtMoney(r.contrib)}</td>
+      <td style="color:${r.profit<0?'#ff8a8a':'#9cffc9'}">${fmtMoney(r.profit)}</td>
+    </tr>
+  `).join('');
+
+  drawChart(d);
+}
+
+update();
+
+const DEFAULTS = {
+  fixedCost: 1183100000,
+  varCost: 184.5,
+  revPerUnit: 597.8,
+  users: 2799943,
+  defection: 17.6
+};
+
+function setPair(baseId, value) {
+  const a = document.getElementById(baseId);
+  const b = document.getElementById(baseId + 'Num');
+  if (a) a.value = value;
+  if (b) b.value = value;
+}
+
+function resetToDefaults() {
+  setPair('fixedCost', DEFAULTS.fixedCost);
+  setPair('varCost', DEFAULTS.varCost);
+  setPair('revPerUnit', DEFAULTS.revPerUnit);
+  setPair('users', DEFAULTS.users);
+  setPair('defection', DEFAULTS.defection);
+  update();
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('resetDefaultsBtn');
+  if (btn) btn.addEventListener('click', resetToDefaults);
+});
+
+</script>
+</body>
+</html>
